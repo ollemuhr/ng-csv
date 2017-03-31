@@ -104,7 +104,7 @@ angular.module('ngCsv.services').
 
       var that = this;
       var csv = "";
-      var csvContent = "";
+      var csvContent = !options.sepHeader ? "" : "sep=" + options.fieldSep + EOL;
 
       var dataPromise = $q.when(data).then(function (responseData) {
         //responseData = angular.copy(responseData);//moved to row creation
@@ -224,7 +224,8 @@ angular.module('ngCsv.directives').
         addByteOrderMarker: "@addBom",
         ngClick: '&',
         charset: '@charset',
-        label: '&csvLabel'
+        label: '&csvLabel',
+        sepHeader: '&sepHeader'
       },
       controller: [
         '$scope',
@@ -256,6 +257,7 @@ angular.module('ngCsv.directives').
             if (angular.isDefined($attrs.csvHeader)) options.header = $scope.$eval($scope.header);
             if (angular.isDefined($attrs.csvColumnOrder)) options.columnOrder = $scope.$eval($scope.columnOrder);
             if (angular.isDefined($attrs.csvLabel)) options.label = $scope.$eval($scope.label);
+            if (angular.isDefined($attrs.sepHeader)) options.sepHeader = $scope.$eval($scope.sepHeader);
 
             options.fieldSep = $scope.fieldSep ? $scope.fieldSep : ",";
 
@@ -313,7 +315,6 @@ angular.module('ngCsv.directives').
             reader.readAsDataURL(blob);
             reader.onloadend = function () {
               var base64data = reader.result;
-              console.log('csv', scope.getFilename());
               downloadLink.attr('download', scope.getFilename());
               downloadLink.attr('href', 'data:application/csv;charset=utf-8' + base64data.slice(base64data.search(/[,;]/)));
             };
