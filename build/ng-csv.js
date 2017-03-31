@@ -135,8 +135,11 @@ angular.module('ngCsv.services').
             var labelArray, labelString;
 
             labelArray = [];
-            angular.forEach(arrData[0], function(value, label) {
-                this.push(that.stringifyField(label, options));
+
+            var iterator = !!options.columnOrder ? options.columnOrder : arrData[0];
+            angular.forEach(iterator, function(value, label) {
+                var val = !!options.columnOrder ? value : label;
+                this.push(that.stringifyField(val, options));
             }, labelArray);
             labelString = labelArray.join(options.fieldSep ? options.fieldSep : ",");
             csvContent += labelString + EOL;
@@ -268,10 +271,16 @@ angular.module('ngCsv.directives').
            */
           $scope.buildCSV = function () {
             var deferred = $q.defer();
+            var data = null;
 
             $element.addClass($attrs.ngCsvLoadingClass || 'ng-csv-loading');
 
-            CSV.stringify($scope.data(), getBuildCsvOptions()).then(function (csv) {
+            data = $scope.data();
+            if(angular.isFunction(data)){
+              data = data();
+            }
+
+            CSV.stringify(data, getBuildCsvOptions()).then(function (csv) {
               $scope.csv = csv;
               $element.removeClass($attrs.ngCsvLoadingClass || 'ng-csv-loading');
               deferred.resolve(csv);
@@ -283,18 +292,41 @@ angular.module('ngCsv.directives').
         }
       ],
       link: function (scope, element, attrs) {
+        function isSafari() {
+          return (/Version\/[\d\.]+.*Safari/).test(window.navigator.userAgent);
+        }
         function doClick() {
           var charset = scope.charset || "utf-8";
           var blob = new Blob([scope.csv], {
             type: "text/csv;charset="+ charset + ";"
           });
-
+          var downloadContainer,
+            downloadLink;
           if (window.navigator.msSaveOrOpenBlob) {
             navigator.msSaveBlob(blob, scope.getFilename());
+          } else if (isSafari()) {
+            downloadContainer = angular.element('<div data-tap-disabled="true"><a></a></div>');
+            downloadLink = angular.element(downloadContainer.children()[0]);
+
+            // Safari doesn't allow downloading of blob urls
+            var reader = new FileReader();
+            reader.readAsDataURL(blob);
+            reader.onloadend = function () {
+              var base64data = reader.result;
+              console.log('csv', scope.getFilename());
+              downloadLink.attr('download', scope.getFilename());
+              downloadLink.attr('href', 'data:application/csv;charset=utf-8' + base64data.slice(base64data.search(/[,;]/)));
+            };
+
+            $document.find('body').append(downloadContainer);
+            $timeout(function () {
+              downloadLink[0].click();
+              downloadLink.remove();
+            }, null);
           } else {
 
-            var downloadContainer = angular.element('<div data-tap-disabled="true"><a></a></div>');
-            var downloadLink = angular.element(downloadContainer.children()[0]);
+            downloadContainer = angular.element('<div data-tap-disabled="true"><a></a></div>');
+            downloadLink = angular.element(downloadContainer.children()[0]);
             downloadLink.attr('href', window.URL.createObjectURL(blob));
             downloadLink.attr('download', scope.getFilename());
             downloadLink.attr('target', '_blank');
